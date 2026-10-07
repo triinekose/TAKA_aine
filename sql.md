@@ -238,7 +238,7 @@ See tagastab ainult veerud `product_name` ja `list_price`, jättes ülejäänud 
 **Ülesanne 1:** Vali kõik andmed tabelist `customers`.
 
 ```sql
--- kirjuta oma vastus siia
+SELECT * FROM customers;
 
 ```
 
@@ -273,7 +273,7 @@ See võimaldab meil kuvada kõige kallimad tooted esimesena või vastupidi.
 **Ülesanne 2:** Vali kõik kliendid ja sorteeri nad pere nime järgi kasvavas järjekorras.
 
 ```sql
--- kirjuta oma vastus siia
+SELECT * FROM customers ORDER BY last_name ASC;
 
 ```
 
@@ -308,7 +308,7 @@ See päring tagastab 10 kõige kallimat toodet.
 **Ülesanne 3:** Vali esimesed 15 kirjet tabelist `sales.orders`, sorteerides need kuupäeva (`order_date`) järgi kahanevas järjekorras:
 
 ```sql
--- kirjuta oma vastus siia
+SELECT * FROM sales.orders ORDER BY order_date DESC LIMIT 15;
 
 ```
 
@@ -407,7 +407,7 @@ LIMIT 10;
 **Ülesanne 4:** Leia kõik kliendid, kes elavad linnas `New York`.
 
 ```sql
--- kirjuta oma vastus siia
+SELECT * FROM customers WHERE city = 'New York';
 
 ```
 
@@ -465,7 +465,8 @@ ORDER BY average_price DESC;
 **Ülesanne 5:** Leia iga müüja (`staff_id`) võetud tellimuste arv, kasutades `sales.orders` tabelit. Sorteeri tulemused kahanevas järjekorras ja kuva ainult esimesed 5 tulemust:
 
 ```sql
--- kirjuta oma vastus siia
+SELECT staff_id, COUNT(*) AS tellimuste_arv FROM sales.orders
+GROUP BY staff_id ORDER BY tellimuste_arv DESC LIMIT 5;
 
 ```
 
@@ -535,7 +536,13 @@ ORDER BY average_price DESC;
 > **Vihje:** Kasuta `CONCAT` funktsiooni, et liita kliendi eesnimi ja perekonnanimi üheks väljaks nimega `customer_name`. Näiteks: `CONCAT(c.first_name, ' ', c.last_name) as customer_name`. See aitab kuvada kliendi täisnime ühes veerus.
 
 ```sql
--- kirjuta oma vastus siia
+SELECT
+CONCAT(c.first_name, ' ', c.last_name) as customer_name,
+COUNT (o.order_id) AS order_count
+FROM sales.customers c
+JOIN sales.orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id;
+
 
 ```
 
@@ -585,7 +592,13 @@ ORDER BY average_price DESC;
 **Ülesanne 7:** Leia kõik tellimused, kus tellitud toodete koguarv (quantity) on suurem kui 8. Kuvage iga tellimuse ID, kliendi täisnimi (eesnimi ja perekonnanimi koos) ning erinevate toodete arv selles tellimuses. Sorteerige tulemused tellimuse ID järgi kasvavas järjekorras.
 
 ```sql
--- kirjuta oma vastus siia
+SELECT o.order_id, CONCAT(c.first_name, ' ', c.last_name) AS customer_name, COUNT(DISTINCT i.product_id) AS product_count
+FROM sales.orders o
+JOIN sales.customers c ON o.customer_id=c.customer_id
+JOIN sales.order_items i ON o.order_id = i.order_id
+GROUP BY o.order_id, c.first_name, c.last_name
+HAVING SUM(i.quantity) > 8
+ORDER BY order_id ASC;
 
 ```
 
