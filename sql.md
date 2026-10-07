@@ -1,320 +1,600 @@
-Tabelandmed Pandasega
+# Sissejuhatus SQL-i
 
-Pandas on Pythoni teek tabelandmete töötlemiseks. Siin õpid andmeid laadima ja kontrollima, ridu valima, uusi veerge arvutama ning rühmade kokkuvõtteid koostama.
+## Eesmärk
+Selles töötoas õpime tundma SQL-i (Structured Query Language - hääldus "ess-cue-ell", inglise keeles ka kui 
+"see-kwuhl" sõnast "SEQUEL") põhitõdesid ja praktiseerime seda PostgreSQL andmebaasi peal Docker konteineri abil.
 
-Eeldused: oskad kasutada listi, sõnastikku, tingimust ja funktsiooni ning kasutada objekti meetodeid. Vajaduse korral korda Intro põhiosa. Põhiosa hõlmab peatükke P1–P6; P7–P9 on valikuline lisamaterjal.
+Töötoa lõpuks oskad:
+- Käivitada PostgreSQL andmebaasi Docker konteineris
+- Ühendada andmebaasiga psql kliendi kaudu
+- Laadida näidisandmeid SQL skriptidest
+- Luua lihtne tabel CSV failist
+- Kirjutada ja lugeda põhilisi SQL päringuid: SELECT, WHERE, ORDER BY, LIMIT, JOIN, GROUP BY
 
-Näited ja harjutused kasutavad sama andmestikku. Näidete käivitamine ei sõltu harjutuste lahendamisest. Vaata lahenduskäike pärast seda, kui oled ise proovinud.
+---
 
-P1. Andmete laadimine
+## Andmebaasi käivitamine Docker abil
 
-Pandas on eraldi paigaldatav teek, mis ei kuulu Pythoni standardteeki. Kui kasutasid alustamisjuhist, on see keskkonnas olemas. Colabis on Pandas tavaliselt juba paigaldatud.
+Tõmba PostgreSQL image ja käivita konteiner:
 
-import pandas as pd impordib Pandase ja annab sellele lühinime pd. Import ei paigalda teeki; pärast kerneli taaskäivitamist tuleb impordilahter uuesti käivitada. from pathlib import Path toob kasutusse standardteegi failitee klassi, mida ei pea eraldi paigaldama. Vajaduse korral korda Intro peatükki I8.
+```bash
+docker run --name postgres-sql -e POSTGRES_PASSWORD=postgres -d postgres
+```
 
-pd.read_csv() on Pandase funktsioon, algandmed.head() aga andmetabeli meetod. Mõlemas on punkt, kuid esimeses pöördud teegi, teises konkreetse tabeli poole. pd.read_csv() loeb CSV-faili DataFrame'iks ehk andmetabeliks. CSV on tekstivorming tabelandmete hoidmiseks. Selles failis on esimesel real veerunimed ja järgmistel ridadel andmed; ühe rea väljad on eraldatud komadega.
+- `--name postgres-sql` → konteineri nimi  
+- `-e POSTGRES_PASSWORD=postgres` → määrame parooli  
+- `-d postgres` → käivita taustal, kasuta Postgres uusimat versiooni
 
-Järgmine lahter otsib faili repo data kaustast. Kui kohalikku faili pole, loetakse sama andmestik kursuse repo veebiaadressilt. Lahter kuvab kasutatud failitee või veebiaadressi. Kui jätkad tööd pärast kerneli taaskäivitamist, käivita esmalt see lahter uuesti.
+Me võime avada ka porti 5432, et lubada ühendus andmebaasiga väljastpoolt konteinerit:
+- `-p 5432:5432` → ava hosti port 5432 ja suuna see konteineri porti 5432.
+    Siin õppetükis me seda ei vaja, sest kasutame `docker exec` käsku. Kui aga soovid
+    ühendada oma arvutist mõne graafilise tööriistaga (nt DBeaver, pgAdmin vms), siis see on vajalik. 
+    *Kuid enne kontrolli, et port 5432 ei oleks juba kasutuses*.
 
-display() kuvab tabeli vormindatult. Ka lahtri viimane avaldis kuvatakse automaatselt; mitme tulemuse jaoks kasuta display() või print().
+---
 
-Dokumentatsioon: read_csv.
+## Ühendumine andmebaasiga psql kliendi abil
 
+Ava interaktiivne `psql` terminal konteineri sees:
 
-# Teekide ja vajalike nimede importimine.
-from pathlib import Path
-import pandas as pd
-from IPython.display import display
+```bash
+docker exec -it postgres-sql psql -U postgres
+```
 
-# Proovi esmalt repo juurkausta, seejärel töövihiku kausta suhtelist teed.
-andmefail = Path("data/Islander_data.csv")
-if not andmefail.is_file():
-    andmefail = Path("../../data/Islander_data.csv")
+- `-U postgres` → ühendutakse kasutajana `postgres`
 
-if andmefail.is_file():
-    allikas = andmefail
-else:
-    allikas = "https://raw.githubusercontent.com/adlerpriit/2025_taka_fall/37b50eb8474faeeb0993c2d4883680bee0560cbd/data/Islander_data.csv"
+Sulle avaneb psql interaktiivne terminal, kus saad SQL käske sisestada. Sarnane prompt nagu pythonis, Bashis või R-is.
+Prompt näeb välja umbes nii:
 
-print("Andmete allikas:", allikas)
-print("Pandase versioon:", pd.__version__)
+```
+postgres=#
+```
+Kus `postgres` on aktiivne andmebaas ja `#` tähendab, et oled ühendatud kasutajana `postgres` (admin). 
+Mõnes teises andmebaasis võib olla `#` asemel `>`, mis tähendab, et oled ühendatud tavakasutajana.
+`=` asemel võib olla ka teisi sümboleid, mis näitavad, et oled pooleli mingi käsu sisestamisega.
+```
+- -- käsk on pooleli
+' -- avatud üksi jutumärk pooleli
+" -- avatud topeltjutumärk pooleli
+) -- avatud sulg on pooleli
+] -- avatud nurksulg on pooleli
+```
 
-# CSV lugemine Pandase tabeliks.
-algandmed = pd.read_csv(allikas)
-display(algandmed.head())
-     
-Andmestikus on virtuaalsete katseisikute mälukatse tulemused. Üks lähterida kirjeldab ühe katseisiku mõõtmisi enne ja pärast katset. age on vanus, Drug ravimirühm ja Dosage annusetase. Happy_Sad_group eristab rõõmsate (H) ja kurbade (S) mälestuste rühma.
+Siia saad kirjutada SQL käske ja päringuid. Sessiooni lõpetamiseks kirjuta `\q` ja vajuta Enter.
 
-Diff = Mem_Score_After − Mem_Score_Before. Positiivne väärtus tähendab skoori suurenemist, negatiivne vähenemist. See ei tähenda mõõdiku täpse selgituseta automaatselt mälu paranemist. Ravimikoodid on A alprasolaam, T triasolaam ja S platseebo.
+Et näha kõiki käske, mis psql-is saad teha, kirjuta `\?`. Mõned kasulikud käsud:
+- `\l` → näita kõiki andmebaase
+- `\c andmebaas` → ühendu andmebaasiga
+- `\dt` → näita kõiki aktiivse andmebaasi tabeleid
+- `\d tabel` → näita tabeli struktuuri
 
-Täielik andmekirjeldus ja allikaviide on repo andmekaustas. Hoia algandmed muutmata ning tee teisendused töökoopias.
+Käivitades Docker konteineri sees PostgreSQL andmebaasi mootori, oleme loonud keskkonna, kus saame hallata ja pärida struktureeritud andmeid. Andmebaasi mootor, nagu PostgreSQL, on tarkvara, mis vastutab andmete talletamise, haldamise ja neile ligipääsu võimaldamise eest. 
 
-P2. Tabel, veerg ja andmete kontroll
+Relatsiooniline andmebaas on seejuures süsteem, mis salvestab andmeid tabelite kujul, kus read esindavad kirjeid ja veerud omadusi. See struktuur võimaldab andmeid loogiliselt organiseerida ja omavahel seostada, muutes nende töötlemise ja analüüsimise tõhusaks. Näiteks võib tabel "customers" sisaldada infot klientide kohta, samas kui tabel "orders" salvestab nende tehtud ostud, ning nende kahe tabeli vahel saab luua seoseid, et andmeid omavahel siduda.
 
-DataFrame on ridadest ja veergudest koosnev andmetabel. Kui valid tabelist ühe veeru kujul inimesed["vanus"], saad Series-objekti: väärtuste jada koos reaindeksiga.
+### Primary Key ja Foreign Key
+- **Primary Key** on veerg või veergude kombinatsioon, mis unikaalselt identifitseerib iga rea tabelis. See tagab, et tabelis ei ole kahte rida sama väärtusega primary key veerus ning väärtus ei saa olla tühi (NULL). Näiteks tabelis "customers" võib veerg `customer_id` olla primary key, kuna see identifitseerib iga kliendi unikaalselt.
 
-Indeks annab igale reale tähise, mille järgi saab seda valida. Järgmises näites loob Pandas indeksiks arvud 0, 1, 2 ja 3. Indeks ei pruugi aga olla rea järjekorranumber: selleks võib kasutada ka teksti või kuupäevi. Filtreerimisel jäävad alles valitud ridade senised indeksiväärtused.
+- **Foreign Key** on veerg, mis viitab teise tabeli primary key-le, luues tabelite vahel seose. See tagab andmete terviklikkuse, kuna foreign key väärtus peab kas vastama seotud tabeli primary key väärtusele või olema tühi (NULL). Näiteks tabelis "orders" võib veerg `customer_id` olla foreign key, mis viitab tabeli "customers" veerule `customer_id`, sidudes iga tellimuse vastava kliendiga.
 
-Hoia reaindeksi väärtused ja veerunimed unikaalsed ehk kordumatud. Tehniliselt lubab Pandas mõlemas kordusi, kuid neid tasub vältida: need võivad muuta valiku tulemuse ootamatuks või põhjustada mõnes toimingus vea.
+---
 
-Alusta väikese tabeliga. Sõnastiku võtmetest saavad veerunimed ja listidest veergude väärtused. Kõigis listides peab olema sama palju elemente.
+## Näidisandmete laadimine SQL skriptidest
 
-Dokumentatsioon: DataFrame, Series.
+Laadi [kursuse Git repo `data`](https://github.com/adlerpriit/2025_taka_fall/tree/main/data/) kataloogist 
+alla `BikeStores_Sample_DataBase.tar.gz` fail ja paki see lahti. Selles arhiivis on kolm SQL skripti:
 
+- `BSD_create_objects.sql`  
+- `BSD_load_data.sql`  
+- `BSD_drop_all_objects.sql`  
 
-# DataFrame: tabeli loomine sõnastikust.
-inimesed = pd.DataFrame({
-    "nimi": ["Mari", "Jaan", "Liis", "Peeter"],
-    "vanus": [24, 38, 29, 46],
-    "linn": ["Tartu", "Tallinn", "Tartu", "Pärnu"],
-})
-display(inimesed)
+> **Märkus:** Näidisandmete algne allikas on [SQL Server Tutorial](https://www.sqlservertutorial.net/getting-started/load-sample-database/). Skriptid on kohandatud töötama PostgreSQL andmebaasis, kuna algsed skriptid olid mõeldud MySQL jaoks.
 
-# Series: ühe veeru valimine tabelist.
-display(inimesed["vanus"])
-     
-Andmetabeli uurimisel küsi kõigepealt: mida üks rida tähendab, millised veerud on olemas ning kas väärtused on sobivat tüüpi?
+Käsureal saab `tar.gz` arhiivi lahti pakkida järgmise käsuga:
 
-.head(n) tagastab esimesed n rida. Nende kuvamiseks kasuta display() või jäta meetodikutse lahtri viimaseks avaldiseks.
-.shape annab enniku (ridade arv, veergude arv). See on atribuut, mistõttu selle järele väljakutse sulge ei lisata.
-.info() näitab veergude tüüpe ja olemasolevate väärtuste arvu.
-.describe() annab siin arvuliste veergude statistilise kokkuvõtte.
-Täisarve sisaldava veeru tüüp võib olla int64, ujukomaarve sisaldaval veerul float64. Tekstiveeru tüübinimi võib Pandase versioonist sõltuvalt olla str, string või object. Andmetüüp ei määra üksi tunnuse tähendust: arvuline annusetase võib analüüsis olla kategooria.
+```bash
+tar -xzf BikeStores_Sample_DataBase.tar.gz
+```
 
-Dokumentatsioon: head, shape, info, describe.
+Kõigepealt loome uue andmebaasi:
 
+```bash
+# host masina käsureal
+docker exec -it postgres-sql psql -U postgres -c "CREATE DATABASE bikestores;"
+
+# kui psql sessioon on avatud, siis seal lihtsalt sisesta prompti
+CREATE DATABASE bikestores;
+```
+
+Kopeeri need konteinerisse ja käivita psql-is:
+
+```bash
+# host masina käsureal
+# kopeeri fail konteinerisse
+docker cp BSD_create_objects.sql postgres-sql:/
+docker cp BSD_load_data.sql postgres-sql:/
+docker cp BSD_drop_all_objects.sql postgres-sql:/
 
-# Atribuut shape: ridade ja veergude arv.
-print("Ridu ja veerge:", inimesed.shape)
+# käivita skriptid
+docker exec -it postgres-sql psql -U postgres -d bikestores -f BSD_create_objects.sql
+docker exec -it postgres-sql psql -U postgres -d bikestores -f BSD_load_data.sql
+```
+Alternatiivina võid skriptid käivitada ka psql sessioonis:
+```sql
+-- psql promptis
+\c bikestores # ühendu bikestores andmebaasiga
+\i BSD_create_objects.sql # loo tabelid ja muud objektid lugedes skripti samast kataloogist, kus psql on avatud
+\i BSD_load_data.sql
+```
 
-# Meetod info(): andmetüübid ja olemasolevate väärtuste arv.
-inimesed.info()
+Kui kõik läks hästi, siis peaksid nüüd nägema `bikestores` andmebaasis mitmeid tabeleid:
 
-# Meetod describe(): arvuliste veergude statistiline kokkuvõte.
-display(inimesed.describe())
-     
-Ülesanne P-01
+```sql
+-- psql promptis
+\dt production.*
+\dt sales.*
+```
 
-Uuri tabelit algandmed: kuva esimesed kaheksa rida, ridade ja veergude arv ning iga veeru andmetüüp ja olemasolevate väärtuste arv. Nimeta kaks arvulist tunnust ning kaks tunnust, mida kasutaksid rühmade moodustamiseks.
+Tekkinud andmebaasi skeem (diagramm) näeb välja selline:
+![BikeStores Database Schema](https://www.sqlservertutorial.net/wp-content/uploads/SQL-Server-Sample-Database.png)
 
-Enesekontroll: faili päises on üheksa veergu. Kas oskad selgitada Drug ja Dosage tähendust?
+---
 
+## CSV faili importimine tabelisse (näide)
 
-# Kirjuta siia oma kood. Vajaduse korral lisa lahtreid.
-     
-Kirjuta siia oma vastus või põhjendus.
+Loome esmalt tabeli, kuhu andmed laadida. Näiteks loome tabeli `islanders` järgmise SQL käsuga:
 
-P3. Valimine, filtreerimine ja sortimine
+```sql
+-- psql promptis
+CREATE TABLE islanders (
+    id serial PRIMARY KEY,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    age INT,
+    Happy_Sad_group VARCHAR(1),
+    Dosage SMALLINT,
+    Drug VARCHAR(1),
+    Mem_Score_Before REAL,
+    Mem_Score_After REAL,
+    Diff REAL
+);
+```
 
-tabel["veerg"] valib ühe veeru ja tagastab Series-objekti. tabel[["a", "b"]] valib veerud "a" ja "b" ning tagastab neist koosneva tabeli. Sisemised nurksulud moodustavad veerunimede listi.
+Seejärel kopeerime CSV faili konteinerisse. Oletame, et fail `Islander_data.csv` asub samas kataloogis, kus käivitate käske:
 
-.loc[read, veerud] võimaldab valida korraga nii ridu kui ka veerge. Enne koma määra valitavad read indeksi tähiste või tingimusega; pärast koma anna veerunimi või veerunimede list.
+```bash
+# host masina käsureal
+docker cp Islander_data.csv postgres-sql:/
+```
 
-Tingimus inimesed["vanus"] >= 30 annab iga rea kohta väärtuse True või False. Kui kasutad seda tingimust ridade valimiseks, jäävad alles ainult True-ga märgitud read. Näites valime vähemalt 30-aastaste inimeste nimed ja linnad.
+Nüüd saame CSV faili andmed importida PostgreSQL tabelisse `islanders`. Avame `psql` sessiooni ja kasutame `\copy` käsku:
 
-Dokumentatsioon: loc.
+```sql
+-- psql promptis
+\copy islanders(first_name, last_name, age, Happy_Sad_group, Dosage, Drug, Mem_Score_Before, Mem_Score_After, Diff) 
+FROM 'Islander_data.csv' 
+DELIMITER ',' 
+CSV HEADER;
+```
 
+- `\copy` – PostgreSQL spetsiifiline käsk andmete importimiseks või eksportimiseks.
+- `DELIMITER ','` – määrab, et veerud on eraldatud komaga.
+- `CSV HEADER` – näitab, et CSV fail sisaldab päiserida, mida ei impordita.
 
-# Veergude valimine veerunimede listiga.
-display(inimesed[["nimi", "vanus"]])
+Kui kõik õnnestus, peaksid andmed olema nüüd tabelis `islanders`. Kontrollime, kas andmed on õigesti laetud:
 
-# Võrdlus: iga rea kohta saadakse True või False.
-display(inimesed["vanus"] >= 30)
+```sql
+-- psql promptis
+SELECT * FROM islanders LIMIT 10;
+```
 
-# loc: tingimusele vastavate ridade ja soovitud veergude valimine.
-vahemalt_30 = inimesed.loc[inimesed["vanus"] >= 30, ["nimi", "linn"]]
-display(vahemalt_30)
-     
-Veergude võrdlemisel saadud tingimusi ühenda märkidega & (ja) ja | (või). Märk ~ pöörab tingimuse vastupidiseks. Pane iga võrdlus sulgudesse. Pythoni and ja or ei sobi tervete tõeväärtusveergude ühendamiseks.
+See päring kuvab tabeli esimesed 10 rida.
 
-.sort_values() järjestab read valitud veeru järgi. ascending=False annab kahaneva järjekorra. Järgmises näites tagastab meetod uue tabeli; algtabel jääb samaks.
+---
 
-Dokumentatsioon: sort_values.
+## SQL päringud samm-sammult
 
+SQL päringud kirjutatakse kindlas järjekorras. Oluline on mõista, et igal klauslil on oma koht ja tähendus.
 
-# Filtreerimine: mõlemad tingimused peavad kehtima.
-tartu_valik = inimesed.loc[
-    (inimesed["linn"] == "Tartu") & (inimesed["vanus"] > 25),
-    ["nimi", "vanus"],
-]
-display(tartu_valik)
+### SELECT (alus)
+`SELECT` lause abil valime andmeid tabelist. See on SQL-i tuum, kuna see määrab, millised andmed andmebaasist tagastatakse. Ilma `SELECT` lauseta ei ole võimalik andmeid pärida. See võimaldab valida konkreetseid veerge, arvutada uusi väärtusi või isegi kombineerida andmeid mitmest tabelist.
 
-# Sortimine: suurima muutusega read esimesena.
-display(algandmed.sort_values("Diff", ascending=False).head(5))
-     
-Ülesanne P-02
+`SELECT` lause on paindlik ja seda saab kombineerida teiste SQL klauslitega, nagu `WHERE`, `ORDER BY`, `GROUP BY` jne, et andmeid täpselt filtreerida ja sorteerida.
 
-Koosta tabelist algandmed kaks eraldi valikut:
+SQL promptis või failis ei ole oluline, kas päring on kirjutatud ühele reale või jagatud mitmele reale. SQL käsu lõppu tähistab semikoolon (`;`), mis annab märku, et käsk on valmis täitmiseks. Näiteks:
 
-Osalejad, kelle vanus on üle 30 ja perekonnanimi Durand.
-Osalejad ravimirühmast A, kelle annusetase on 3.
-Kuva kummagi valiku ridade arv. Sorteeri teine valik Diff järgi kahanevalt.
+```sql
+SELECT veerg1, veerg2 
+FROM tabel;
+```
 
-Vihje: ridade arvu saad len(tabel) abil. Enesekontroll: kontrolli, et iga valitud rida vastab mõlemale tingimusele. Sorteeritud tabelis peab iga järgmine Diff-väärtus olema eelmisest väiksem või sellega võrdne.
+või
 
+```sql
+SELECT veerg1, veerg2 FROM tabel;
+```
 
-# Kirjuta siia oma kood. Vajaduse korral lisa lahtreid.
-     
-Kirjuta siia oma vastus või põhjendus.
+Mõlemad päringud on kehtivad ja annavad sama tulemuse. Reavahetused ja tühikud SQL-is ei mõjuta käsu täitmist, kuid nende kasutamine võib muuta päringu loetavamaks ja hooldatavamaks -- eriti kui haldad päriguid koodi või `sql` skripti sees.
 
-P4. Uus veerg ja puuduvad väärtused
+```sql
+SELECT * FROM tabel; -- kõik veerud
+```
 
-.copy() loob tabelist koopia, mida saad muuta algtabelit muutmata. Uue veeru lisamiseks kirjuta omistamise vasakule poolele tabeli nimi ja nurksulgudesse uus veerunimi, näiteks andmed["arvutatud_muutus"]. Paremale poole kirjuta arvutus.
+Näiteks, kui kasutame `bikestores` andmebaasi, saame valida kõik tooted tabelist `production.products`:
 
-Kahe veeru lahutamisel leitakse siin iga rea jaoks pärast- ja enneskoori vahe. Eraldi Pythoni tsüklit pole vaja.
+```sql
+SELECT * FROM production.products;
+```
 
-Dokumentatsioon: copy.
+See päring tagastab kõik veerud ja kõik read tabelist `production.products`. Kui soovime valida ainult toote nime ja hinda, saame seda teha järgmiselt:
 
+```sql
+SELECT product_name, list_price FROM production.products;
+```
 
-# Töökoopia loomine algandmeid muutmata.
-andmed = algandmed.copy()
+See tagastab ainult veerud `product_name` ja `list_price`, jättes ülejäänud veerud välja. See on kasulik, kui soovime töötada ainult konkreetse andmekogumiga.
 
-# Arvuline veerg: pärast- ja enneskoori vahe.
-andmed["arvutatud_muutus"] = andmed["Mem_Score_After"] - andmed["Mem_Score_Before"]
 
-# Tõeväärtusveerg: kas skoor suurenes?
-andmed["skoor_suurenes"] = andmed["Diff"] > 0
-display(andmed[["Mem_Score_Before", "Mem_Score_After", "Diff", "arvutatud_muutus", "skoor_suurenes"]].head())
-     
-Puuduvate väärtuste loendamine koosneb kahest sammust:
+**Ülesanne 1:** Vali kõik andmed tabelist `customers`.
 
-.isna() annab iga tabeliväärtuse kohta tõeväärtuse: True, kui väärtus puudub, ja False, kui see on olemas.
-Sellele järgnev .sum() liidab tõeväärtused igas veerus. True läheb arvesse ühena ja False nullina, seega saad iga veeru puuduvate väärtuste arvu.
-Puuduv väärtus tähendab, et andmed on teadmata või sisestamata. See ei ole sama mis arv 0. Enne eemaldamist või täitmist selgita välja, millised read muutuksid ja kuidas see analüüsi mõjutab.
+```sql
+-- kirjuta oma vastus siia
 
-Allpool on eraldi näidistabel, kus üks vanus puudub. .dropna(subset=["vanus"]) jätab kõrvale ainult puuduva vanusega read. Seda võib kasutada analüüsis, mis vajab teadaolevat vanust; arvesta, et osa kirjeid jääb siis analüüsist välja.
+```
 
-Dokumentatsioon: isna, sum, dropna.
+---
 
+### ORDER BY (sorteerimine)
+`ORDER BY` määrab, mis järjekorras tulemused tagastatakse. Vaikimisi on järjestus kasvav (`ASC`), kuid seda saab muuta kahanevaks (`DESC`).
 
-# isna() märgib puuduvad väärtused; sum() loendab need veergude kaupa.
-display(algandmed.isna().sum())
+```sql
+SELECT * FROM tabel ORDER BY veerg1 ASC;
+SELECT * FROM tabel ORDER BY veerg1 DESC;
+```
 
-# Eraldi näidistabel, milles üks vanus puudub.
-naide = pd.DataFrame({"nimi": ["Mari", "Jaan"], "vanus": [24, None]})
-display(naide)
+Näiteks, kui kasutame `bikestores` andmebaasi, saame sorteerida kõik tooted tabelist `production.products` hinna järgi kasvavas järjekorras:
 
-# dropna(): puuduva vanusega ridade väljajätmine.
-display(naide.dropna(subset=["vanus"]))
-     
-Ülesanne P-03
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+ORDER BY list_price ASC;
+```
 
-Loo tabelist algandmed koopia. Lisa sellesse veerg muutus_vahemalt_10: väärtus on True, kui Diff >= 10, ja muul juhul False. Loenda tingimusele vastavad read. Kontrolli ka puuduvate Diff-väärtuste arvu.
+Kui soovime sorteerida kahanevas järjekorras, muudame `ASC` väärtuseks `DESC`:
 
-Vihje: tõeväärtusveeru .sum() loendab True-väärtusi. Enesekontroll: kas kasutad õiget veerunime ja kas piirväärtus 10 on kaasatud? Selgita, miks False ei tähenda puuduvat väärtust.
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+ORDER BY list_price DESC;
+```
 
+See võimaldab meil kuvada kõige kallimad tooted esimesena või vastupidi.
 
-# Kirjuta siia oma kood. Vajaduse korral lisa lahtreid.
-     
-Kirjuta siia oma vastus või põhjendus.
+**Ülesanne 2:** Vali kõik kliendid ja sorteeri nad pere nime järgi kasvavas järjekorras.
 
-P5. Rühmade kokkuvõte
+```sql
+-- kirjuta oma vastus siia
 
-groupby("Drug") koondab sama ravimikoodiga read ühte rühma. Sellele järgnev .agg() arvutab iga rühma kohta soovitud kokkuvõtted.
+```
 
-Kirjes keskmine_muutus=("Diff", "mean") on keskmine_muutus loodava veeru nimi. Sulgudes olev ennik määrab, millisest veerust väärtused võtta ("Diff") ja milline arvutus teha ("mean" ehk keskmine).
+---
 
-mean arvutab keskmise ja median mediaani. Puuduvad väärtused jäetakse neist arvutustest välja.
-size loendab kõik rühma read.
-count loendab valitud veeru olemasolevad väärtused. Puuduva väärtusega rida selle arvu sisse ei lähe.
-Lisa keskmise kõrvale nii ridade arv kui ka kasutatud väärtuste arv. Nii näed rühma suurust ja seda, kui paljude väärtuste põhjal keskmine arvutati.
+### LIMIT (piira tulemuste hulka)
+`LIMIT` piirab tagastatavate ridade arvu. See on kasulik, kui soovid vaadata ainult osa andmetest, näiteks esimesed 10 rida.
 
-Dokumentatsioon: groupby, agg, size, count.
+```sql
+SELECT * FROM tabel LIMIT 10;
+```
 
+Kui kombineerid `LIMIT` klausli `ORDER BY` klausliga, siis on oluline, et andmed sorteeritakse enne, kui neid piiratakse. Näiteks:
 
-# groupby() ja agg(): rühmade kokkuvõtted.
-kokkuvote = algandmed.groupby("Drug").agg(
-    keskmine_muutus=("Diff", "mean"),
-    mediaan=("Diff", "median"),
-    ridu=("Diff", "size"),
-    skooriga_ridu=("Diff", "count"),
-).reset_index()  # Rühmitamistunnus tagasi tavaliseks veeruks.
+```sql
+SELECT * FROM tabel ORDER BY veerg1 ASC LIMIT 5;
+```
 
-# round(): ümardatud tulemuse kuvamine algset kokkuvõtet muutmata.
-display(kokkuvote.round(2))
-     
-Pärast rühmitamist on ravimikood kokkuvõttetabeli indeksis. .reset_index() teeb sellest tavalise veeru Drug ning loob uue reaindeksi alates nullist.
+Selles päringus sorteeritakse andmed kõigepealt veeru `veerg1` järgi kasvavas järjekorras ja seejärel tagastatakse ainult esimesed 5 rida. Kui `ORDER BY` klauslit ei kasutata, siis tagastatakse andmed andmebaasi vaikimisi järjekorras, mis võib olla juhuslik.
 
-.round(2) tagastab tabeli, mille arvväärtused on ümardatud kahe komakohani. Näites kuvame selle tulemuse; muutujas kokkuvote säilivad ümardamata väärtused.
+Näideks valime esimesed 10 toodet tabelist `production.products`, sorteerides need hinna järgi kahanevas järjekorras:
 
-Siin annavad size ja count sama tulemuse, sest veerus Diff pole puuduvaid väärtusi. Allolevas väikeses näites erinevad need arvud.
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+ORDER BY list_price DESC 
+LIMIT 10;
+```
 
-Dokumentatsioon: reset_index, round.
+See päring tagastab 10 kõige kallimat toodet.
 
+**Ülesanne 3:** Vali esimesed 15 kirjet tabelist `sales.orders`, sorteerides need kuupäeva (`order_date`) järgi kahanevas järjekorras:
 
-# Näidistabel: rühmas A on üks skoor puudu.
-puuduvusega = pd.DataFrame({"ruhm": ["A", "A", "B"], "skoor": [5, None, 8]})
+```sql
+-- kirjuta oma vastus siia
 
-# size loendab kõik read; count ainult olemasolevad skoorid.
-display(puuduvusega.groupby("ruhm").agg(ridu=("skoor", "size"), skooriga_ridu=("skoor", "count")))
-     
-Rühmade läbimine for-tsükliga
+```
 
-groupby() tagastab GroupBy-objekti, mida saad läbida for-tsükliga. Igal sammul saad kaks väärtust:
+---
 
-ravimikood on rühma võti, siin veeru Drug väärtus;
-ruhma_tabel on selle rühma kõiki ridu ja algseid veerge sisaldav DataFrame.
-Näites kuvame iga ravimirühma suuruse ja kaks suurima skoorimuutusega kirjet. Sortimine ja ridade valimine toimuvad iga rühma sees eraldi.
+### WHERE (filtreerimine)
+`WHERE` klausliga saab seada tingimusi, millele andmed peavad vastama. See on kasulik, kui soovid päringus tagastada ainult teatud tingimustele vastavaid andmeid.
 
-sort_values() argument key määrab funktsiooni, mida rakendatakse veerule enne järjestamist. Siin kasutab key=abs absoluutväärtusi; tabelis säilivad algsed märgiga väärtused.
+Näiteks, kui soovid valida kõik saarlased, kelle vanus on üle 20:
 
-Tsükkel sobib siis, kui tahad iga rühmaga teha mitu toimingut, näiteks uurida selle ridu, koostada graafiku või salvestada eraldi faili. Tavalise kokkuvõttetabeli, näiteks rühmade keskmiste ja suuruste leidmiseks kasuta .agg()-i.
+```sql
+SELECT * FROM tabel WHERE age > 20;
+```
 
-Dokumentatsioon: rühmade läbimine, sort_values ja key.
+Või kui soovid valida kõik saarlased, kellele anti `A` droogi:
 
+```sql
+SELECT * FROM tabel WHERE Drug = 'A';
+```
 
-# Rühmade läbimine: igal sammul rühma võti ja sellele vastav alamtabel.
-for ravimikood, ruhma_tabel in algandmed.groupby("Drug"):
-    print(f"Ravimirühm {ravimikood}: {len(ruhma_tabel)} kirjet")
+### Mitme tingimuse kombineerimine WHERE klauslis
 
-    # Selle rühma kahe absoluutväärtuselt suurima muutuse valimine.
-    suurimad = ruhma_tabel.sort_values("Diff", key=abs, ascending=False).head(2)
-    display(suurimad[["Mem_Score_Before", "Mem_Score_After", "Diff"]])
-     
-Ülesanne P-04
+`WHERE` klauslis saab kasutada loogilisi operaatorid, et kombineerida mitu tingimust. Peamised operaatorid on:
+- `AND` – mõlemad tingimused peavad olema tõesed.
+- `OR` – vähemalt üks tingimus peab olema tõene.
+- `NOT` – tingimus peab olema väär.
 
-Rühmita algandmed annusetaseme (Dosage) järgi. Leia iga rühma keskmine Diff ja ridade arv. Millise rühma keskmine on suurim? Mida üks kokkuvõttetabeli rida tähistab?
+#### Näide 1: AND operaator
+Leia kõik tooted, mille hind on suurem kui 100 ja kategooria ID on 3:
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+WHERE list_price > 100 AND category_id = 3;
+```
 
-Enesekontroll: kui liidad kokku iga rühma ridade arvu, pead saama algtabeli ridade arvu. Põhjenda, miks see tabel üksi ei tõesta annuse põhjuslikku mõju.
+#### Näide 2: OR operaator
+Leia kõik tooted, mille hind on suurem kui 500 või kategooria ID on 2:
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+WHERE list_price > 500 OR category_id = 2;
+```
 
+#### Näide 3: NOT operaator
+Leia kõik tooted, mis ei kuulu kategooriasse 1:
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+WHERE NOT category_id = 1;
+```
 
-# Kirjuta siia oma kood. Vajaduse korral lisa lahtreid.
-     
-Kirjuta siia oma vastus või põhjendus.
+#### Näide 4: Kombineeritud tingimused
+Leia kõik tooted, mille hind on suurem kui 100 ja kategooria ID on 3, või mille hind on väiksem kui 50:
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+WHERE (list_price > 100 AND category_id = 3) OR list_price < 50;
+```
 
-P6. Tulemuse salvestamine
+Sulud on olulised, et määrata tingimuste täpne järjekord ja loogika. Ilma nendeta võib päringu tulemus olla ootamatu.
 
-Salvesta kokkuvõte CSV-faili. index=False jätab Pandase reaindeksi failist välja, nii et CSV-sse lähevad ainult tabeli veerud. Sama nimega faili salvestamine kirjutab varasema sisu üle. Loe fail pärast salvestamist uuesti sisse ja kontrolli selle sisu.
+`WHERE` klauslit saab kombineerida teiste SQL klauslitega, nagu `ORDER BY` ja `LIMIT`, et andmeid täpsemalt filtreerida, sorteerida ja piirata. Näiteks:
 
-Dokumentatsioon: to_csv.
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+WHERE list_price > 100 
+ORDER BY list_price DESC 
+LIMIT 5;
+```
 
+Selles päringus:
+- `WHERE list_price > 100` filtreerib välja kõik tooted, mille hind on väiksem kui 100.
+- `ORDER BY list_price DESC` sorteerib tulemused hinna järgi kahanevas järjekorras.
+- `LIMIT 5` tagastab ainult esimesed 5 rida.
 
-# Failitee koostamine ja kausta loomine.
-kaust = Path("valjund")
-kaust.mkdir(exist_ok=True)
-fail = kaust / "ravimiruhmade_kokkuvote.csv"
+**Näide 1:** Leia kõik tooted, mille hind on suurem kui 500, ja sorteeri need hinna järgi kasvavas järjekorras:
 
-# CSV salvestamine ilma Pandase reaindeksita.
-kokkuvote.to_csv(fail, index=False)
-print("Salvestatud:", fail.resolve())
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+WHERE list_price > 500 
+ORDER BY list_price ASC;
+```
 
-# Salvestatud faili uuesti lugemine sisu kontrollimiseks.
-display(pd.read_csv(fail))
-     
-Ülesanne P-05
+**Näide 2:** Leia kõik tooted, mille kategooria ID on 3, ja tagasta ainult esimesed 10 tulemust, sorteerides need nime järgi:
 
-Vasta tekstilahtris:
+```sql
+SELECT product_name, list_price 
+FROM production.products 
+WHERE category_id = 3 
+ORDER BY product_name ASC 
+LIMIT 10;
+```
 
-Mille poolest erinevad .shape ja .head()?
-Millal annavad size ja count eri tulemuse?
-Miks on filtris (algandmed["age"] > 30) & (algandmed["Drug"] == "A") mõlemad tingimused sulgudes?
-Enesekontroll: leia iga vastuse juurde sobiv näide põhiosast.
+**Ülesanne 4:** Leia kõik kliendid, kes elavad linnas `New York`.
 
+```sql
+-- kirjuta oma vastus siia
 
-# Kirjuta siia oma kood. Vajaduse korral lisa lahtreid.
-     
-Kirjuta siia oma vastus või põhjendus.
+```
 
-Põhiosa on läbitud. Edasi liigu Seaborni vihikusse. Vajaduse korral võrdle oma vastuseid lahenduskäikudega.
+---
 
-Järgmised peatükid on lisamaterjal. Nende läbimine ei ole Seaborni vihiku põhiosa ega lõpuülesande eelduseks.
+### GROUP BY (rühmitamine ja agregeerimine)
+
+`GROUP BY` kogub read gruppidesse, millele saab rakendada agregeerivaid funktsioone, nagu `COUNT`, `SUM`, `AVG`, `MAX`, `MIN`. See on kasulik, kui soovid andmeid kokku võtta või analüüsida rühmade kaupa.
+
+Näiteks, kui soovid teada, mitu toodet kuulub igasse kategooriasse tabelis `production.products`, saad kasutada järgmist päringut:
+
+```sql
+SELECT category_id, COUNT(*) AS product_count
+FROM production.products
+GROUP BY category_id;
+```
+
+- `COUNT(*)` loendab kõik read igas grupis. Siin loetakse, mitu toodet on igas kategoorias.
+- `AS product_count` annab tulemusele loogilise nime, mida on lihtsam lugeda ja kasutada.
+
+`GROUP BY` toimub `SELECT` lause sees pärast `WHERE` tingimusi ja enne `ORDER BY` või `LIMIT` klausleid. Näiteks:
+
+```sql
+SELECT category_id, COUNT(*) AS product_count
+FROM production.products
+WHERE list_price > 100
+GROUP BY category_id
+ORDER BY product_count DESC
+LIMIT 5;
+```
+
+Selles päringus:
+1. `WHERE` filtreerib välja tooted, mille hind on üle 100.
+2. `GROUP BY` rühmitab tulemused kategooriate kaupa.
+3. `COUNT(*)` arvutab iga grupi suuruse.
+4. `ORDER BY` sorteerib tulemused grupi suuruse järgi kahanevalt.
+5. `LIMIT` piirab tulemused viie grupini.
+
+**Näide 1:** Arvuta, mitu toodet kuulub igasse brändi tabelis `production.products`:
+
+```sql
+SELECT brand_id, COUNT(*) AS product_count
+FROM production.products
+GROUP BY brand_id;
+```
+**Näide 2:** Leia iga brändi keskmine tootehind tabelis `production.products` ja sorteeri tulemused kahanevas järjekorras:
+
+```sql
+SELECT brand_id, AVG(list_price) AS average_price
+FROM production.products
+GROUP BY brand_id
+ORDER BY average_price DESC;
+```
+
+**Ülesanne 5:** Leia iga müüja (`staff_id`) võetud tellimuste arv, kasutades `sales.orders` tabelit. Sorteeri tulemused kahanevas järjekorras ja kuva ainult esimesed 5 tulemust:
+
+```sql
+-- kirjuta oma vastus siia
+
+```
+
+---
+
+### JOIN (ühenda tabelid)
+
+Andmebaasis on sageli mitu tabelit, mis on omavahel seotud. `JOIN` abil ühendame need tabelid ühtseks tulemuseks. `JOIN` toimub `SELECT` lause sees ja seda saab kombineerida `WHERE`, `GROUP BY`, `ORDER BY` ja `LIMIT` klauslitega.
+
+#### JOIN tüübid:
+- **`INNER JOIN`** – tagastab ainult need read, kus mõlemas tabelis on vaste.
+- **`LEFT JOIN`** – tagastab kõik vasakpoolse tabeli read, ka siis kui paremas pole vastet.
+- **`RIGHT JOIN`** – vastupidi `LEFT JOIN`-ile.
+- **`FULL JOIN`** – tagastab kõik read mõlemast tabelist.
+
+Näiteks, kui soovid kuvada iga toote nime koos selle kategooria nimega, saad kasutada järgmist päringut:
+
+```sql
+SELECT p.product_name, c.category_name
+FROM production.products p
+JOIN production.categories c ON p.category_id = c.category_id;
+```
+
+- `p` ja `c` on tabelite lühendid (aliased), mis muudavad päringu loetavamaks ja lühemaks.
+- Lühendite kasutamine on vajalik, kui ühendad mitu tabelit, millel võivad olla samanimelised veerud. Näiteks `category_id` eksisteerib mõlemas tabelis.
+
+#### Kuidas valida aliasi?
+Alias ei *pea* olema ühetäheline, kuid see peaks olema lühike ja loogiline, et muuta päringud loetavamaks. Näiteks:
+- `p` toodete (`products`) jaoks.
+- `cat` kategooriate (`categories`) jaoks.
+- `ord` tellimuste (`orders`) jaoks.
+
+#### JOIN koos teiste klauslitega
+`JOIN` toimub `SELECT` lause sees pärast `FROM` ja enne `WHERE`, `GROUP BY`, `ORDER BY` või `LIMIT`. Näiteks:
+
+```sql
+SELECT p.product_name, c.category_name, COUNT(o.order_id) AS order_count
+FROM production.products p
+JOIN production.categories c ON p.category_id = c.category_id
+LEFT JOIN sales.order_items o ON p.product_id = o.product_id
+WHERE c.category_name = 'Electric Bikes'
+GROUP BY p.product_name, c.category_name
+ORDER BY order_count DESC
+LIMIT 10;
+```
+
+Selles päringus:
+1. `JOIN` ühendab tabelid `products`, `categories` ja `order_items`.
+2. `WHERE` filtreerib ainult kategooria "Electric Bikes".
+3. `GROUP BY` rühmitab tulemused toote ja kategooria järgi.
+4. `COUNT(o.order_id)` arvutab iga toote tellimuste arvu.
+5. `ORDER BY` sorteerib tulemused tellimuste arvu järgi kahanevalt.
+6. `LIMIT` piirab tulemused kümne reani.
+
+#### Näide: Ühenda `production.products` ja `production.brands`, et kuvada iga brändi toodete keskmine hind, ümmardatuna kahe komakohani:
+
+```sql
+SELECT b.brand_name, ROUND(AVG(p.list_price), 2) AS average_price
+FROM production.products p
+JOIN production.brands b ON p.brand_id = b.brand_id
+GROUP BY b.brand_name
+ORDER BY average_price DESC;
+```
+
+**Ülesanne 6:** Leia iga kliendi nimi ja tema tellimuste arv, ühendades tabelid `sales.customers` ja `sales.orders`:
+
+> **Vihje:** Kasuta `CONCAT` funktsiooni, et liita kliendi eesnimi ja perekonnanimi üheks väljaks nimega `customer_name`. Näiteks: `CONCAT(c.first_name, ' ', c.last_name) as customer_name`. See aitab kuvada kliendi täisnime ühes veerus.
+
+```sql
+-- kirjuta oma vastus siia
+
+```
+
+---
+
+### HAVING (filtreerimine pärast rühmitamist)
+
+Kui `WHERE` klausel filtreerib andmeid enne rühmitamist, siis `HAVING` klausel filtreerib andmeid pärast rühmitamist. See tähendab, et `HAVING` töötab koos rühmitatud andmetega ja võimaldab rakendada tingimusi agregeeritud väärtustele, nagu `COUNT`, `SUM`, `AVG`, `MAX`, `MIN`.
+
+`HAVING` asub `SELECT` lause osas pärast `GROUP BY` klauslit ja enne `ORDER BY` klauslit. Näiteks:
+
+```sql
+SELECT category_id, COUNT(*) AS product_count
+FROM production.products
+GROUP BY category_id
+HAVING COUNT(*) > 30
+ORDER BY product_count DESC;
+```
+
+Selles päringus:
+1. `GROUP BY` rühmitab andmed kategooriate kaupa.
+2. `COUNT(*)` arvutab iga grupi suuruse.
+3. `HAVING COUNT(*) > 30` filtreerib välja ainult need grupid, kus on rohkem kui 30 toodet.
+4. `ORDER BY product_count DESC` sorteerib tulemused grupi suuruse järgi kahanevalt.
+
+#### Näide 1: Leia kõik brändid, millel on rohkem kui 5 toodet, ja sorteeri need kahanevalt toote arvu järgi:
+
+```sql
+SELECT brand_id, COUNT(*) AS product_count
+FROM production.products
+GROUP BY brand_id
+HAVING COUNT(*) > 5
+ORDER BY product_count DESC;
+```
+
+#### Näide 2: Leia kõik kategooriad, mille toodete keskmine hind on suurem kui 100, ja sorteeri need kahanevalt keskmise hinna järgi:
+
+```sql
+SELECT c.category_name, ROUND(AVG(p.list_price), 2) AS average_price
+FROM production.products p
+JOIN production.categories c ON p.category_id = c.category_id
+GROUP BY c.category_name
+HAVING AVG(p.list_price) > 100
+ORDER BY average_price DESC;
+```
+
+**Ülesanne 7:** Leia kõik tellimused, kus tellitud toodete koguarv (quantity) on suurem kui 8. Kuvage iga tellimuse ID, kliendi täisnimi (eesnimi ja perekonnanimi koos) ning erinevate toodete arv selles tellimuses. Sorteerige tulemused tellimuse ID järgi kasvavas järjekorras.
+
+```sql
+-- kirjuta oma vastus siia
+
+```
+
+---
+
+## Kokkuvõte
+
+Selles töötoas õppisime:
+- PostgreSQL käivitamist Dockeris
+- Põhilisi SQL päringuid (SELECT, WHERE, ORDER BY, LIMIT, GROUP BY, JOIN, HAVING)
+
+Kui tunned, et siinne materjal jäi napiks või soovid edasi õppida, leiad rohkem õppetükke ja loogiliselt järgmisi teemasid [SQL Server Tutorial](https://www.sqlservertutorial.net/sql-server-basics/) lehelt. Lisaks pakume põhjalikumat käsitlust andmebaaside teemal meie kursusel [Andmebaasid (LTAT.02.021)](https://ois2.ut.ee/#/courses/LTAT.02.021/details), kuhu saad end registreerida.
